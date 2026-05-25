@@ -20,3 +20,7 @@ bin
 
 snyk
 snyk.sarif
+.aider*
+logs/
+.commit0_scripts/
+.github/workflows/

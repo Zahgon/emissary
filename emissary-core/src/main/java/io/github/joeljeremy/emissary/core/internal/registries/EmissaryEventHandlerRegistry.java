@@ -1,7 +1,6 @@
 package io.github.joeljeremy.emissary.core.internal.registries;
 
 import static java.util.Objects.requireNonNull;
-
 import io.github.joeljeremy.emissary.core.Event;
 import io.github.joeljeremy.emissary.core.EventHandler;
 import io.github.joeljeremy.emissary.core.EventHandlerProvider;
@@ -17,170 +16,131 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.WeakHashMap;
 
-/** The default event handler registry. */
+/**
+ * The default event handler registry.
+ */
 @Internal
 public class EmissaryEventHandlerRegistry implements EventHandlerRegistry, EventHandlerProvider {
 
-  private final RegisteredEventHandlersByEventType eventHandlersByEventType =
-      new RegisteredEventHandlersByEventType();
-  private final InstanceProvider instanceProvider;
-  private final WeakHashMap<Class<? extends Annotation>, Void> customEventHandlerAnnotations;
+    private final RegisteredEventHandlersByEventType eventHandlersByEventType = new RegisteredEventHandlersByEventType();
 
-  /**
-   * Constructor.
-   *
-   * @param instanceProvider The instance provider.
-   * @param customEventHandlerAnnotations The supported event handler annotations. Using a
-   *     WeakHashMap to avoid holding a strong reference on the annotation classes. The annontation
-   *     classes are the keys and the values are ignored.
-   */
-  public EmissaryEventHandlerRegistry(
-      InstanceProvider instanceProvider,
-      WeakHashMap<Class<? extends Annotation>, Void> customEventHandlerAnnotations) {
-    this.instanceProvider = requireNonNull(instanceProvider);
-    this.customEventHandlerAnnotations = requireNonNull(customEventHandlerAnnotations);
-  }
+    private final InstanceProvider instanceProvider;
 
-  /** {@inheritDoc} */
-  @Override
-  public EmissaryEventHandlerRegistry register(Class<?>... eventHandlerClasses) {
-    requireNonNull(eventHandlerClasses);
+    private final WeakHashMap<Class<? extends Annotation>, Void> customEventHandlerAnnotations;
 
-    for (Class<?> eventHandlerClass : eventHandlerClasses) {
-      Method[] methods = eventHandlerClass.getMethods();
-      // Register all methods marked with @EventHandler.
-      for (Method method : methods) {
-        if (!isEventHandler(method)) {
-          continue;
+    /**
+     * Constructor.
+     *
+     * @param instanceProvider The instance provider.
+     * @param customEventHandlerAnnotations The supported event handler annotations. Using a
+     *     WeakHashMap to avoid holding a strong reference on the annotation classes. The annontation
+     *     classes are the keys and the values are ignored.
+     */
+    public EmissaryEventHandlerRegistry(InstanceProvider instanceProvider, WeakHashMap<Class<? extends Annotation>, Void> customEventHandlerAnnotations) {
+        this.instanceProvider = requireNonNull(instanceProvider);
+        this.customEventHandlerAnnotations = requireNonNull(customEventHandlerAnnotations);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public EmissaryEventHandlerRegistry register(Class<?>... eventHandlerClasses) {
+        throw new UnsupportedOperationException("STUB: not implemented");
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public <T extends Event> List<RegisteredEventHandler<T>> getEventHandlersFor(Class<T> eventType) {
+        throw new UnsupportedOperationException("STUB: not implemented");
+    }
+
+    private void register(Class<?> eventType, Method eventHandlerMethod) {
+        eventHandlersByEventType.register(eventType, buildEventHandler(eventHandlerMethod, instanceProvider));
+    }
+
+    private boolean isEventHandler(Method method) {
+        for (Annotation annotation : method.getAnnotations()) {
+            if (EventHandler.class == annotation.annotationType()) {
+                return true;
+            }
+            if (customEventHandlerAnnotations.containsKey(annotation.annotationType())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static RegisteredEventHandler<?> buildEventHandler(Method eventHandlerMethod, InstanceProvider instanceProvider) {
+        EventHandlerMethod eventHandlerMethodLambda = LambdaFactory.createLambdaFunction(eventHandlerMethod, EventHandlerMethod.class);
+        final Class<?> eventHandlerClass = eventHandlerMethod.getDeclaringClass();
+        final String eventHandlerString = eventHandlerMethod.toGenericString();
+        // Only request event handler instance when invoked instead of during registration time.
+        return new RegisteredEventHandler<Event>() {
+
+            @Override
+            public void invoke(Event event) {
+                throw new UnsupportedOperationException("STUB: not implemented");
+            }
+
+            @Override
+            public String toString() {
+                throw new UnsupportedOperationException("STUB: not implemented");
+            }
+        };
+    }
+
+    private static void validateMethodParameters(Method method) {
+        if (method.getParameterCount() != 1) {
+            throw new IllegalArgumentException("Methods marked with @EventHandler must accept a single parameter which is the event" + " object.");
+        }
+    }
+
+    private static void validateMethodReturnType(Method method) {
+        if (!void.class.equals(method.getReturnType())) {
+            throw new IllegalArgumentException("Methods marked with @EventHandler must have a void return type.");
+        }
+    }
+
+    private static class RegisteredEventHandlersByEventType extends ClassValue<List<RegisteredEventHandler<?>>> {
+
+        private final ImmutableRegisteredEventHandlersByEventType immutableDecorator = new ImmutableRegisteredEventHandlersByEventType(this);
+
+        @Override
+        protected List<RegisteredEventHandler<?>> computeValue(Class<?> eventType) {
+            throw new UnsupportedOperationException("STUB: not implemented");
         }
 
-        validateMethodParameters(method);
-        validateMethodReturnType(method);
+        public List<RegisteredEventHandler<?>> getImmutable(Class<?> eventType) {
+            throw new UnsupportedOperationException("STUB: not implemented");
+        }
 
-        // First parameter in the method is the event object.
-        register(method.getParameterTypes()[0], method);
-      }
+        public void register(Class<?> eventType, RegisteredEventHandler<?> eventHandler) {
+            throw new UnsupportedOperationException("STUB: not implemented");
+        }
+
+        private void refreshImmutables(Class<?> eventType) {
+            immutableDecorator.remove(eventType);
+        }
     }
 
-    return this;
-  }
+    /**
+     * Decorates another {@code ClassValue<List<RegisteredEventHandler<?>>>} instance to return
+     * immutable lists.
+     */
+    private static class ImmutableRegisteredEventHandlersByEventType extends ClassValue<List<RegisteredEventHandler<?>>> {
 
-  /** {@inheritDoc} */
-  @Override
-  public <T extends Event> List<RegisteredEventHandler<T>> getEventHandlersFor(Class<T> eventType) {
-    requireNonNull(eventType);
+        private final ClassValue<List<RegisteredEventHandler<?>>> base;
 
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    List<RegisteredEventHandler<T>> eventHandlers =
-        (List) eventHandlersByEventType.getImmutable(eventType);
-    return eventHandlers;
-  }
+        public ImmutableRegisteredEventHandlersByEventType(ClassValue<List<RegisteredEventHandler<?>>> base) {
+            this.base = requireNonNull(base);
+        }
 
-  private void register(Class<?> eventType, Method eventHandlerMethod) {
-    eventHandlersByEventType.register(
-        eventType, buildEventHandler(eventHandlerMethod, instanceProvider));
-  }
-
-  private boolean isEventHandler(Method method) {
-    for (Annotation annotation : method.getAnnotations()) {
-      if (EventHandler.class == annotation.annotationType()) {
-        return true;
-      }
-
-      if (customEventHandlerAnnotations.containsKey(annotation.annotationType())) {
-        return true;
-      }
+        @Override
+        protected List<RegisteredEventHandler<?>> computeValue(Class<?> eventType) {
+            throw new UnsupportedOperationException("STUB: not implemented");
+        }
     }
-    return false;
-  }
-
-  private static RegisteredEventHandler<?> buildEventHandler(
-      Method eventHandlerMethod, InstanceProvider instanceProvider) {
-    EventHandlerMethod eventHandlerMethodLambda =
-        LambdaFactory.createLambdaFunction(eventHandlerMethod, EventHandlerMethod.class);
-
-    final Class<?> eventHandlerClass = eventHandlerMethod.getDeclaringClass();
-    final String eventHandlerString = eventHandlerMethod.toGenericString();
-
-    // Only request event handler instance when invoked instead of during registration time.
-    return new RegisteredEventHandler<Event>() {
-      @Override
-      public void invoke(Event event) {
-        eventHandlerMethodLambda.invoke(instanceProvider.getInstance(eventHandlerClass), event);
-      }
-
-      @Override
-      public String toString() {
-        return eventHandlerString;
-      }
-    };
-  }
-
-  private static void validateMethodParameters(Method method) {
-    if (method.getParameterCount() != 1) {
-      throw new IllegalArgumentException(
-          "Methods marked with @EventHandler must accept a single parameter which is the event"
-              + " object.");
-    }
-  }
-
-  private static void validateMethodReturnType(Method method) {
-    if (!void.class.equals(method.getReturnType())) {
-      throw new IllegalArgumentException(
-          "Methods marked with @EventHandler must have a void return type.");
-    }
-  }
-
-  private static class RegisteredEventHandlersByEventType
-      extends ClassValue<List<RegisteredEventHandler<?>>> {
-    private final ImmutableRegisteredEventHandlersByEventType immutableDecorator =
-        new ImmutableRegisteredEventHandlersByEventType(this);
-
-    @Override
-    protected List<RegisteredEventHandler<?>> computeValue(Class<?> eventType) {
-      return new ArrayList<>();
-    }
-
-    public List<RegisteredEventHandler<?>> getImmutable(Class<?> eventType) {
-      return immutableDecorator.get(eventType);
-    }
-
-    public void register(Class<?> eventType, RegisteredEventHandler<?> eventHandler) {
-      requireNonNull(eventType);
-      requireNonNull(eventHandler);
-
-      get(eventType).add(eventHandler);
-
-      // Because this ClassValue has changed, we need to re-initialize the immutable
-      // ClassValue so that the cached values are thrown away. The next `getImmutable` would then
-      // invoke the immutable ClassValue's `computeValue` method to return the updated list which
-      // includes the newly registered handlers.
-      refreshImmutables(eventType);
-    }
-
-    private void refreshImmutables(Class<?> eventType) {
-      immutableDecorator.remove(eventType);
-    }
-  }
-
-  /**
-   * Decorates another {@code ClassValue<List<RegisteredEventHandler<?>>>} instance to return
-   * immutable lists.
-   */
-  private static class ImmutableRegisteredEventHandlersByEventType
-      extends ClassValue<List<RegisteredEventHandler<?>>> {
-
-    private final ClassValue<List<RegisteredEventHandler<?>>> base;
-
-    public ImmutableRegisteredEventHandlersByEventType(
-        ClassValue<List<RegisteredEventHandler<?>>> base) {
-      this.base = requireNonNull(base);
-    }
-
-    @Override
-    protected List<RegisteredEventHandler<?>> computeValue(Class<?> eventType) {
-      // Take advantage of the performance benefits of immutable lists.
-      return List.copyOf(base.get(eventType));
-    }
-  }
 }

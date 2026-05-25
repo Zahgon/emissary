@@ -10,14 +10,13 @@ import java.util.Optional;
  * The default {@link RequestHandlerInvocationStrategy} which invokes the request handlers
  * synchronously.
  */
-public class SyncRequestHandlerInvocationStrategy
-    implements Emissary.RequestHandlerInvocationStrategy {
+public class SyncRequestHandlerInvocationStrategy implements Emissary.RequestHandlerInvocationStrategy {
 
-  /** {@inheritDoc} */
-  @Override
-  public <T extends Request<R>, R> Optional<R> invoke(
-      RegisteredRequestHandler<T, R> requestHandler, T request) {
-
-    return requestHandler.invoke(request);
-  }
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public <T extends Request<R>, R> Optional<R> invoke(RegisteredRequestHandler<T, R> requestHandler, T request) {
+        throw new UnsupportedOperationException("STUB: not implemented");
+    }
 }
